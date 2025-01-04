@@ -1,4 +1,4 @@
-//	ebootLoader PoC
+//	ebootLoader, Help needed to fix this broken mess, VS 2017 with ORBIS SDK needed
 //
 //	PURPOSE: Makes debugging a lot easier by loading an easily replaceable eboot from /data
 //
@@ -29,12 +29,14 @@
 
 #define TARGET_EXEC_PATH "/data/ebootGTA.bin"
 
-// shows a simple dialog message with an ok button
+// shows a simple dialog message with an ok button  (NOT WORKING YET, WIP)
 void ShowDialog(const char* message) {
+	int loadmodule;
 	printf("in ShowDialog\n");
 	sceSystemServiceHideSplashScreen();
 	printf("message: %s\n",message);
-	if (sceSysmoduleLoadModule(SCE_SYSMODULE_MESSAGE_DIALOG) != SCE_SYSMODULE_LOADED) {
+	loadmodule = sceSysmoduleLoadModule(SCE_SYSMODULE_MESSAGE_DIALOG);
+	if (loadmodule != SCE_SYSMODULE_LOADED) {
 		printf("Module not loaded\n");
 		return;
 	}
@@ -43,7 +45,6 @@ void ShowDialog(const char* message) {
 	_sceCommonDialogBaseParamInit(&baseParam);
 	SceMsgDialogParam dialogParam;
 	memset(&dialogParam, 0, sizeof(SceMsgDialogParam));
-	sceMsgDialogParamInitialize(&dialogParam);
 	dialogParam.baseParam = baseParam;
 	dialogParam.mode = SCE_MSG_DIALOG_MODE_USER_MSG;
 
@@ -61,16 +62,18 @@ void ShowDialog(const char* message) {
 		memset(dialogParam.userMsgParam, 0, sizeof(SceMsgDialogUserMessageParam));
 		printf("memset\n");
 	}
+	sceMsgDialogParamInitialize(&dialogParam);
 	printf("outside of if\n");
 	dialogParam.userMsgParam->msg = message;
 	dialogParam.userMsgParam->buttonType = SCE_MSG_DIALOG_BUTTON_TYPE_OK;
-	printf("opening dialog\n");
+	
 	printf("initing commondialog\n");
 	sceCommonDialogInitialize();
 	printf("initing msgdialog\n");
 	sceMsgDialogInitialize();
 	msgdialogstatus = sceMsgDialogGetStatus();
 	printf("msgdialogstatus after Init %x\n", msgdialogstatus);
+	printf("opening dialog\n");
 	sceMsgDialogOpen(&dialogParam);
 	sceMsgDialogUpdateStatus();
 	msgdialogstatus = sceMsgDialogGetStatus();
@@ -86,13 +89,25 @@ void ShowDialog(const char* message) {
 	sceSysmoduleUnloadModule(SCE_SYSMODULE_MESSAGE_DIALOG);
 }
 
+// ALSO NOT WORKING
 void LoadExecutable(const char *path) {
 	int ret, checkreachability;
 	printf("in LoadExecutable\n");
 	checkreachability = sceKernelCheckReachability(path);
-	printf("is reachable %x", checkreachability);
+	if (checkreachability < SCE_OK) {
+		printf("not reachable\n");
+		return;
+	}
+	else {
+		printf("is reachable?\n");
+	}
 	ret = sceSystemServiceLoadExec(path,NULL);
-	printf("Trying to load executable %s rc %x", path, ret);
+	if (ret < SCE_OK) {
+		printf("failed to load executable %x\n",ret);
+	}
+	else {
+		printf("successfully loaded executable %s ret %x?",path,ret);
+	}
 }
 
 int main() {
