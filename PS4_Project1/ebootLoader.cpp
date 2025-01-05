@@ -6,6 +6,7 @@
 
 // headers (most of them aren't even needed or used but whatever)
 #include <scebase.h>
+#include <sceerror.h>
 #include <kernel.h>
 #include <stdio.h>
 #include <common_dialog.h>
@@ -35,14 +36,16 @@ void ShowDialog(const char* message) {
 	printf("in ShowDialog\n");
 	sceSystemServiceHideSplashScreen();
 	printf("message: %s\n",message);
+
 	loadmodule = sceSysmoduleLoadModule(SCE_SYSMODULE_MESSAGE_DIALOG);
-	if (loadmodule != SCE_SYSMODULE_LOADED) {
+	if (loadmodule < SCE_SYSMODULE_LOADED) {
 		printf("Module not loaded\n");
 		return;
 	}
 	SceCommonDialogBaseParam baseParam;
 	memset(&baseParam, 0, sizeof(SceCommonDialogBaseParam));
 	_sceCommonDialogBaseParamInit(&baseParam);
+
 	SceMsgDialogParam dialogParam;
 	memset(&dialogParam, 0, sizeof(SceMsgDialogParam));
 	dialogParam.baseParam = baseParam;
@@ -62,6 +65,7 @@ void ShowDialog(const char* message) {
 		memset(dialogParam.userMsgParam, 0, sizeof(SceMsgDialogUserMessageParam));
 		printf("memset\n");
 	}
+
 	sceMsgDialogParamInitialize(&dialogParam);
 	printf("outside of if\n");
 	dialogParam.userMsgParam->msg = message;
@@ -73,6 +77,7 @@ void ShowDialog(const char* message) {
 	sceMsgDialogInitialize();
 	msgdialogstatus = sceMsgDialogGetStatus();
 	printf("msgdialogstatus after Init %x\n", msgdialogstatus);
+
 	printf("opening dialog\n");
 	sceMsgDialogOpen(&dialogParam);
 	sceMsgDialogUpdateStatus();
@@ -104,6 +109,7 @@ void LoadExecutable(const char *path) {
 	ret = sceSystemServiceLoadExec(path,NULL);
 	if (ret < SCE_OK) {
 		printf("failed to load executable %x\n",ret);
+		return;
 	}
 	else {
 		printf("successfully loaded executable %s ret %x?",path,ret);
