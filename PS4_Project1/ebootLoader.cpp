@@ -34,7 +34,7 @@
 void ShowDialog(const char* message) {
 	int loadmodule;
 	printf("in ShowDialog\n");
-	sceSystemServiceHideSplashScreen();
+	//sceSystemServiceHideSplashScreen();
 	printf("message: %s\n",message);
 
 	loadmodule = sceSysmoduleLoadModule(SCE_SYSMODULE_MESSAGE_DIALOG);
@@ -71,8 +71,6 @@ void ShowDialog(const char* message) {
 	dialogParam.userMsgParam->msg = message;
 	dialogParam.userMsgParam->buttonType = SCE_MSG_DIALOG_BUTTON_TYPE_OK;
 	
-	printf("initing commondialog\n");
-	sceCommonDialogInitialize();
 	printf("initing msgdialog\n");
 	sceMsgDialogInitialize();
 	msgdialogstatus = sceMsgDialogGetStatus();
@@ -87,7 +85,7 @@ void ShowDialog(const char* message) {
 	printf("about to start checking status\n");
 	while (sceMsgDialogUpdateStatus() != SCE_COMMON_DIALOG_STATUS_FINISHED) {
 		sceKernelUsleep(1000);
-	}
+	} 
 	printf("outside of while\n");
 	sceMsgDialogTerminate();
 	free(dialogParam.userMsgParam);
@@ -118,10 +116,12 @@ void LoadExecutable(const char *path) {
 
 int main() {
 	sceSystemServiceHideSplashScreen();
+	printf("initing commondialog\n");
+	sceCommonDialogInitialize();
 	printf("Starting %s\n", TARGET_EXEC_PATH);
 	const char *execpath = TARGET_EXEC_PATH;
-	//const char *dialogMessage = "Starting eboot";
-	//ShowDialog(dialogMessage);
+	const char *dialogMessage = "Starting eboot";
+	ShowDialog(dialogMessage);
 	printf("Done with showdialog\n");
 	LoadExecutable(execpath);
 	return 0;
