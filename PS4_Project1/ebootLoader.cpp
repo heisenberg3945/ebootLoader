@@ -6,6 +6,7 @@
 
 // headers (most of them aren't even needed or used but whatever)
 #include <scebase.h>
+#include <app_content.h>
 #include <sceerror.h>
 #include <kernel.h>
 #include <stdio.h>
@@ -29,8 +30,10 @@
 #pragma comment(lib, "libSceMsgDialog_stub_weak.a")
 
 #define TARGET_EXEC_PATH "/data/ebootGTA.bin"
+#define FALLBACK_PATH "/app0/ebootGTA.bin"
 
 // shows a simple dialog message with an ok button  (NOT WORKING YET, WIP)
+// idea : move this function to main()
 void ShowDialog(const char* message) {
 	int loadmodule;
 	printf("in ShowDialog\n");
@@ -48,9 +51,9 @@ void ShowDialog(const char* message) {
 
 	SceMsgDialogParam dialogParam;
 	memset(&dialogParam, 0, sizeof(SceMsgDialogParam));
+	sceMsgDialogParamInitialize(&dialogParam);
 	dialogParam.baseParam = baseParam;
 	dialogParam.mode = SCE_MSG_DIALOG_MODE_USER_MSG;
-
 	int msgdialogstatus = sceMsgDialogGetStatus();
 	printf("msgdialogstatus before alloc %x\n", msgdialogstatus);
 
@@ -66,7 +69,7 @@ void ShowDialog(const char* message) {
 		printf("memset\n");
 	}
 
-	sceMsgDialogParamInitialize(&dialogParam);
+	
 	printf("outside of if\n");
 	dialogParam.userMsgParam->msg = message;
 	dialogParam.userMsgParam->buttonType = SCE_MSG_DIALOG_BUTTON_TYPE_OK;
@@ -93,6 +96,7 @@ void ShowDialog(const char* message) {
 }
 
 // ALSO NOT WORKING
+// potential fix : move this function to main()
 void LoadExecutable(const char *path) {
 	int ret, checkreachability;
 	printf("in LoadExecutable\n");
@@ -106,8 +110,15 @@ void LoadExecutable(const char *path) {
 	}
 	ret = sceSystemServiceLoadExec(path,NULL);
 	if (ret < SCE_OK) {
-		printf("failed to load executable %x\n",ret);
-		return;
+		printf("failed to load executable %s %x\n",path,ret);
+		ret = sceSystemServiceLoadExec(FALLBACK_PATH, NULL);
+		if (ret < SCE_OK) {
+			printf("failed to load exectuable %s %x\n", TARGET_EXEC_PATH, ret);
+			return;
+		}
+		else {
+			printf("successfully loaded from fallback path\n");
+		}
 	}
 	else {
 		printf("successfully loaded executable %s ret %x?",path,ret);
