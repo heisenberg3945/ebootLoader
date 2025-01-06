@@ -81,8 +81,10 @@ void ShowDialog(const char* message) {
 
 	printf("opening dialog\n");
 	sceMsgDialogOpen(&dialogParam);
-	sceMsgDialogUpdateStatus();
 	msgdialogstatus = sceMsgDialogGetStatus();
+
+	// ISSUE : Even after opening the dialog, the status remains SCE_COMMON_DIALOG_STATUS_INITIALIZED instead of SCE_COMMON_DIALOG_STATUS_RUNNING, and the dialog doesn't get opened and it gets stuck in the while loop
+	// FIX : I have no fucking clue
 	printf("msgdialogstatus after DialogOpen %x\n", msgdialogstatus);
 	//sceMsgDialogOpen(&dialogParam);
 	printf("about to start checking status\n");
@@ -113,7 +115,7 @@ void LoadExecutable(const char *path) {
 		printf("failed to load executable %s %x\n",path,ret);
 		ret = sceSystemServiceLoadExec(FALLBACK_PATH, NULL);
 		if (ret < SCE_OK) {
-			printf("failed to load exectuable %s %x\n", TARGET_EXEC_PATH, ret);
+			printf("failed to load exectuable %s %x\n", FALLBACK_PATH, ret);
 			return;
 		}
 		else {
