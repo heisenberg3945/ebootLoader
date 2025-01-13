@@ -1,8 +1,8 @@
-//	ebootLoader, Help needed to fix this broken mess, VS 2017 with ORBIS SDK needed
+//	ebootLoader, Help needed to fix this broken mess
 //
 //	PURPOSE: Makes debugging a lot easier by loading an easily replaceable eboot from /data
 //
-//	Built with ORBIS SDK 8.008.051 
+//	Build reqs: ORBIS SDK 1.750 or newer and Visual Studio 2017
 
 // headers (most of them aren't even needed or used but whatever)
 #include <scebase.h>
@@ -22,6 +22,7 @@
 #include <libime.h>
 #include <string.h>
 #include <_fs.h>
+#include "displayf.h"
 //#include <pad.h>
 
 // needed libs 
@@ -37,19 +38,24 @@
 
 #define TARGET_EXEC_PATH "/data/lso.bin"
 #define FALLBACK_PATH "/app0/gtabin.bin"
+#define HANG_TIMEOUT 1000000
 
-// doesn't work
 int ShowDialog(const char* message) {
-	int loadmodule, msgdialogstatus, ret;
-	unsigned int i = 0;
-	printf("in ShowDialog\n");
-	printf("message: %s\n", message);
-	loadmodule = sceSysmoduleLoadModule(SCE_SYSMODULE_MESSAGE_DIALOG);
-	if (loadmodule < SCE_SYSMODULE_LOADED) {
-		printf("Module not loaded\n");
-		return loadmodule;
+	int32_t ret;
+	uint32_t i = 0;
+	Displayf("in ShowDialog");
+	if (!message) {
+		Displayf("Invalid message string passed, aborting to prevent SIGSEGV fault..");
+		return -1;
 	}
-	printf("loaded message dialog module\n");
+	Displayf("message: %s", message);
+	Displayf("initializing messagedialog");
+	ret = sceMsgDialogInitialize();
+	if (ret < SCE_OK) {
+		Displayf("Failed to initialize Message Dialog ret %x", ret);
+		return ret;
+	}
+	Displayf("Initialized Message Dialog");
 
 	SceCommonDialogBaseParam baseParam;
 	_sceCommonDialogBaseParamInit(&baseParam);
@@ -57,26 +63,26 @@ int ShowDialog(const char* message) {
 
 
 	sceMsgDialogParamInitialize(&dialogParam);
-	printf("initing msgdialog\n");
-	ret = sceMsgDialogInitialize();
-	if (ret < 0) {
-		printf("Failed to initialize Message Dialog ret %x", ret);
-		return ret;
-	}
-	msgdialogstatus = sceMsgDialogGetStatus();
-	printf("status after init %x\n", msgdialogstatus);
+	//printf("initing msgdialog\n");
+	
+	//msgdialogstatus = sceMsgDialogGetStatus();
+	//printf("status after init %x\n", msgdialogstatus);
 
 	SceMsgDialogUserMessageParam messageParam;
-	memset(&messageParam, 0x00, sizeof(SceMsgDialogUserMessageParam));  // Ensures no leftover data
+	messageParam = {};  // Have to zero it out to not have random data (leading to a crash possibly)
 	messageParam.msg = message;
 	messageParam.buttonType = SCE_MSG_DIALOG_BUTTON_TYPE_OK;
+	Displayf("Zeroing out messageParam.reserved");
+	memset(messageParam.reserved, 0x0, sizeof(messageParam.reserved));
 
 	dialogParam.baseParam = baseParam;
 	dialogParam.mode = SCE_MSG_DIALOG_MODE_USER_MSG;
 	dialogParam.userMsgParam = &messageParam;
-//	dialogParam.size = SCE_MSG_DIALOG_USER_MSG_SIZE;
-	msgdialogstatus = sceMsgDialogGetStatus();
-	printf("msgdialogstatus before alloc %x\n", msgdialogstatus);
+	dialogParam.size = sizeof(SceMsgDialogParam);
+	Displayf("Zeroing out dialogParam.reserved");
+	memset(dialogParam.reserved, 0x0, sizeof(dialogParam.reserved));
+	//msgdialogstatus = sceMsgDialogGetStatus();
+	//printf("msgdialogstatus before alloc %x\n", msgdialogstatus);
 	/*
 	if (!dialogParam.userMsgParam) {
 		printf("Allocating memory for userMsgParam\n");
@@ -93,91 +99,84 @@ int ShowDialog(const char* message) {
 //	dialogParam.userMsgParam = (SceMsgDialogUserMessageParam*)malloc(sizeof(SceMsgDialogUserMessageParam));
 //	dialogParam.userMsgParam->msg = message;
 	//dialogParam.userMsgParam->buttonType = SCE_MSG_DIALOG_BUTTON_TYPE_OK;
-	msgdialogstatus = sceMsgDialogGetStatus();
-	printf("msgdialogstatus before open %x\n", msgdialogstatus);
-	printf("opening dialog\n");
+	//msgdialogstatus = sceMsgDialogGetStatus();
+	//printf("msgdialogstatus before open %x\n", msgdialogstatus);
+	Displayf("opening dialog");
 	ret = sceMsgDialogOpen(&dialogParam);
 	if (ret < 0) {
-		printf("failed to open dialog ret %x\n", ret);
+		Displayf("failed to open dialog, ret = %x", ret);
 		return ret;
 	}
-	msgdialogstatus = sceMsgDialogGetStatus();
-
-	// ISSUE : Even after opening the dialog, the status remains SCE_COMMON_DIALOG_STATUS_INITIALIZED instead of SCE_COMMON_DIALOG_STATUS_RUNNING, and the dialog doesn't get opened and it gets stuck in the while loop
+	//msgdialogstatus = sceMsgDialogGetStatus();
+	// ISSUE : Dialog Open always fails due to "Invalid Param"
 	// FIX : I have no fucking clue
-	printf("msgdialogstatus after DialogOpen %x\n", msgdialogstatus);
-	printf("about to start checking status\n");
+	//printf("msgdialogstatus after DialogOpen %x\n", msgdialogstatus);
+	Displayf("about to start checking status");
 	while (sceMsgDialogUpdateStatus() != SCE_COMMON_DIALOG_STATUS_FINISHED) {
-		sceKernelUsleep(1000);
-		printf("dialog status %x  %x", sceMsgDialogGetStatus(), sceMsgDialogUpdateStatus());
-		i++;
-		if (i >= 10000000) {
-			printf("hang detected, aborting..\n");
+		sceKernelUsleep(1000);	// time is measured in microseconds
+		Displayf("dialog status %x  %x", sceMsgDialogGetStatus(), sceMsgDialogUpdateStatus());
+		if (i++ >= HANG_TIMEOUT && sceMsgDialogUpdateStatus() != SCE_COMMON_DIALOG_STATUS_RUNNING) {	// have to make sure that the dialog is running or else it will return when the user waits too long to respond (~10 seconds)
+			Displayf("hang detected, aborting..");
 			return -1;
 		}
 	}
-	printf("outside of while\n");
-	sceMsgDialogTerminate();
+	Displayf("Closing dialog and returning");
 	sceMsgDialogClose();
-	sceSysmoduleUnloadModule(SCE_SYSMODULE_MESSAGE_DIALOG);
-	return 0;
+	sceMsgDialogTerminate();
+	return SCE_OK;
 }
 
 // works but only conditionally
 int LoadExecutable(const char *path) {
-	int ret, checkreachability, showdialogv, lpath = 0;
-	printf("in LoadExecutable\n");
-	checkreachability = sceKernelCheckReachability(path);
-	if (checkreachability < SCE_OK) {
-		printf("not reachable %x\n", checkreachability);
-		showdialogv = ShowDialog("Could not reach /data, trying app0\n");
-		if (showdialogv < 0) {
-			printf("showdialog failed\n");
-		}
-		lpath = 1;
+	int ret;
+	Displayf("in LoadExecutable");
+	ret = sceKernelCheckReachability(path);
+	const char *execpath = (ret < SCE_OK) ? FALLBACK_PATH : path;
+	if (strcmp(path, execpath)) {
+		Displayf("%s wasn't reachable launching %s", path, execpath); 
+		ShowDialog(static_cast<const char*>("Cannot launch from /data, trying /app0"));
 	}
-	else {
-		printf("is reachable? %x\n", checkreachability);
-	}
-	ret = ShowDialog("Launching Grand theft Auto V");
+	ret = ShowDialog(static_cast<const char*>("Launching Grand Theft Auto V"));
 	if (ret < 0) {
-		printf("showdialog failed\n");
+		Displayf("showdialog failed");
 		//return ret;
 	}
-	if (!lpath) {
-		ret = sceSystemServiceLoadExec(path, NULL);
-	}
-	else {
-		ret = sceSystemServiceLoadExec(FALLBACK_PATH, NULL);
-	}
+	ret = sceSystemServiceLoadExec(execpath, NULL);
 	if (ret < SCE_OK) {
-		printf("failed to load executable %s %x\n", path, ret);
-		ret = sceSystemServiceLoadExec(FALLBACK_PATH, NULL);
-		if (ret < SCE_OK) {
-			printf("failed to load exectuable %s %x\n", FALLBACK_PATH, ret);
-			return ret;
-		}
-		else {
-			printf("successfully loaded from fallback path\n");
-			return ret;
-		}
+		Displayf("failed to load executable %s %x", path, ret);
+		return ret;
 	}
 	else {
-		printf("successfully loaded executable %s ret %x?", path, ret);
+		Displayf("successfully loaded executable %s ret %x?", path, ret);
 		return ret;
 	}
 }
 
 int main() {
-	int ret;
+	int32_t ret;
 	sceSystemServiceHideSplashScreen();
-	printf("initing commondialog\n");
+	Displayf("initing commondialog\n");
 	ret = sceCommonDialogInitialize();
 	if (ret != SCE_OK) {
-		printf("Failed to initialize Common Dialog\n");
+		Displayf("Failed to initialize Common Dialog");
 		return ret;
 	}
-	printf("Starting %s\n", TARGET_EXEC_PATH);
+	ret = sceSysmoduleLoadModule(SCE_SYSMODULE_MESSAGE_DIALOG);
+	if (ret < SCE_SYSMODULE_LOADED) {
+		Displayf("Failed to load Message Dialog PRX");
+		return ret;
+	}
+	Displayf("loaded message dialog module");
+	
+	/*
+	ret = sceMsgDialogInitialize();
+	if (ret < SCE_OK) {
+		printf("Failed to initialize Message Dialog ret %x", ret);
+		return ret;
+	}
+	printf("loaded message dialog module\n");
+	*/
+	Displayf("Starting %s", TARGET_EXEC_PATH);
 	//const char *dialogMessage = "Starting eboot";
 	//ShowDialog(dialogMessage);
 	//printf("Done with showdialog\n");
