@@ -4,8 +4,8 @@
             "name": "windows-gcc-x64",
             "includePath": [
                 "${workspaceFolder}/**",
-                "D:\\PS4 Software Development Kit\\ORBIS SDKs\\1.700\\target\\include",
-                "D:\\PS4 Software Development Kit\\ORBIS SDKs\\1.700\\target\\include_common"
+                "D:\\PS4 Software Development Kit\\ORBIS SDKs\\8.000\\target\\include",
+                "D:\\PS4 Software Development Kit\\ORBIS SDKs\\8.000\\target\\include_common"
             ],
             "compilerPath": "gcc",
             "cStandard": "c11",
