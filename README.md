@@ -1,2 +1,2 @@
 # ebootLoader
-Simple program that loads "ebootGTA.bin" from /data
+Simple program that loads a user selected executable
